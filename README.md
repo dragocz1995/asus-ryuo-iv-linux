@@ -4,7 +4,8 @@ Sends live system sensor data (CPU/GPU temperature, usage, clock speed, memory) 
 
 Reverse-engineered from the Windows "ASUS Info Hub" Electron app and the Android HomeUI APK running on the LCD.
 
-![ASUS ROG RYUO IV](https://rog.asus.com/cooler/all-in-one/rog-ryuo-iv/spec/)
+<img width="1080" height="1080" alt="videoframe_8327" src="https://github.com/user-attachments/assets/a8978e0a-14df-4a82-9089-29cb452a563d" />
+
 
 ## Features
 
