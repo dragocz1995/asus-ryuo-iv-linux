@@ -7,6 +7,7 @@ Wants=multi-user.target
 Type=simple
 ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/python3 -u /usr/local/bin/ryuo-lcd.py
+ExecStop=/usr/bin/python3 -u /usr/local/bin/ryuo-lcd.py --stop
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

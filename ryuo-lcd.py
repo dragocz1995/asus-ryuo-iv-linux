@@ -72,10 +72,6 @@ def escape_bytes(data):
     return bytes(r)
 
 def build_packet(content_json, msg_id, cmd_type="all"):
-    # First line: {requestState} {cmdType} {version}
-    # requestState must equal "POST" exactly (not "POST1.0")
-    # cmdType must be "all" for sensor data, "waterBlockScreenId" for config
-    # IMPORTANT: LCD uses \r\n (CRLF) line endings, not \n!
     CR = "\r\n"
     header_str = f"POST {cmd_type} 1{CR}"
     header_str += f"ContentType=json{CR}"
@@ -126,6 +122,25 @@ def send_screen_config(dev, msg_id):
     send_packet(dev, packet)
     print(f"Sent ScreenConfig: {config['id']}")
 
+def send_brightness(dev, msg_id, level):
+    """Send brightness config (0-100)"""
+    config = {"brightness": level}
+    content = json.dumps(config, separators=(',', ':'))
+    packet = build_packet(content, msg_id, cmd_type="config")
+    send_packet(dev, packet)
+    print(f"Sent brightness: {level}")
+
+def stop_lcd():
+    """Set LCD brightness to 0 before shutdown"""
+    print("Stopping LCD...")
+    dev = hid.device()
+    dev.open(VID, PID)
+    dev.set_nonblocking(1)
+    send_brightness(dev, 0, 0)
+    time.sleep(1)
+    dev.close()
+    print("LCD off.")
+
 def main():
     print("Opening RYUO IV HID device...")
     dev = hid.device()
@@ -134,7 +149,6 @@ def main():
     print(f"Connected: {dev.get_manufacturer_string()} {dev.get_product_string()}")
 
     msg_id = 0
-    config_sent = False
 
     # Send screen config FIRST before any sensor data
     send_screen_config(dev, msg_id)
@@ -168,4 +182,7 @@ def main():
     print("Done.")
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == '--stop':
+        stop_lcd()
+    else:
+        main()
