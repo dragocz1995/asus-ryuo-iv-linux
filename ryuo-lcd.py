@@ -1,7 +1,40 @@
 #!/usr/bin/env python3
 """ASUS ROG RYUO IV LCD - Send sensor data via USB HID (hidapi)"""
-import json, time, struct, os, sys
-import hid
+import json, time, struct, os, sys, subprocess
+
+try:
+    import hid
+except ModuleNotFoundError:
+    import hidapi as _hidapi
+
+    class _CompatDevice:
+        def __init__(self):
+            self._dev = None
+
+        def open(self, vendor_id, product_id):
+            self._dev = _hidapi.Device(vendor_id=vendor_id, product_id=product_id)
+
+        def set_nonblocking(self, flag):
+            # Ubuntu's python3-hidapi opens in blocking mode by default.
+            return None
+
+        def write(self, data):
+            return self._dev.write(data)
+
+        def close(self):
+            if self._dev is not None:
+                self._dev.close()
+
+        def get_manufacturer_string(self):
+            return self._dev.get_manufacturer_string()
+
+        def get_product_string(self):
+            return self._dev.get_product_string()
+
+    class hid:
+        @staticmethod
+        def device():
+            return _CompatDevice()
 
 VID = 0x0B05
 PID = 0x1C76
@@ -122,23 +155,28 @@ def send_screen_config(dev, msg_id):
     send_packet(dev, packet)
     print(f"Sent ScreenConfig: {config['id']}")
 
-def send_brightness(dev, msg_id, level):
-    """Send brightness config (0-100)"""
-    config = {"brightness": level}
-    content = json.dumps(config, separators=(',', ':'))
-    packet = build_packet(content, msg_id, cmd_type="config")
-    send_packet(dev, packet)
-    print(f"Sent brightness: {level}")
+RYUO_SERIAL = "TC25030400202130"
+BACKLIGHT_PATH = "/sys/class/backlight/backlight/brightness"
+BACKLIGHT_MAX = 256
+
+def set_brightness_adb(level):
+    """Set LCD backlight via ADB sysfs (level 0-100 mapped to 0-256)"""
+    value = int(BACKLIGHT_MAX * max(0, min(100, level)) / 100)
+    try:
+        subprocess.run(
+            ["adb", "-s", RYUO_SERIAL, "shell",
+             f"echo {value} > {BACKLIGHT_PATH}"],
+            timeout=5, capture_output=True
+        )
+        print(f"Set brightness: {level}% (backlight={value})")
+    except Exception as e:
+        print(f"Brightness error: {e}", file=sys.stderr)
 
 def stop_lcd():
     """Set LCD brightness to 0 before shutdown"""
     print("Stopping LCD...")
-    dev = hid.device()
-    dev.open(VID, PID)
-    dev.set_nonblocking(1)
-    send_brightness(dev, 0, 0)
+    set_brightness_adb(0)
     time.sleep(1)
-    dev.close()
     print("LCD off.")
 
 def main():
@@ -153,7 +191,11 @@ def main():
     # Send screen config FIRST before any sensor data
     send_screen_config(dev, msg_id)
     msg_id += 1
-    time.sleep(2)
+    time.sleep(1)
+
+    # Set brightness to 100% via ADB
+    set_brightness_adb(100)
+    time.sleep(1)
 
     while True:
         try:
